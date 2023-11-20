@@ -50,60 +50,91 @@ struct TreeNode *LeftCtor(struct TreeNode *tnode)
 struct TreeNode *RightCtor(struct TreeNode *tnode)
 {
     TREE_ASSERT(tnode);
-    if (!tnode) {
-        printf("nil ");
+    if (!tnode)
         return NULL;
-    }
+
     struct TreeNode *right = TreeNodeCtor();
     tnode->right = right;
     return tnode->right;
 }
 
-void PostfixPrintTree(const struct TreeNode *tnode)
+void PostfixPrintTree(FILE *input, const struct TreeNode *tnode)
 {
     TREE_ASSERT(tnode);
+    assert(input);
     if (!tnode) {
-        printf("nil ");
+        fprintf(input, "nil ");
         return;
     }
-    printf("(");
-    PostfixPrintTree(tnode->left);
-    PostfixPrintTree(tnode->right);
-    printf(PRI_TREE_TYPE, tnode->data);
-    printf(")");
+    fprintf(input, "(");
+    PostfixPrintTree(input, tnode->left);
+    PostfixPrintTree(input, tnode->right);
+    fprintf(input, TREE_TYPE_FMT, tnode->data);
+    fprintf(input, ")");
 	return;
 }
 
-void PrefixPrintTree(const struct TreeNode *tnode)
+void PrefixPrintTree(FILE *input, const struct TreeNode *tnode)
 {
     TREE_ASSERT(tnode);
+    assert(input);
     if (!tnode) {
-        printf(" nil");
+        fprintf(input, "(nil)");
         return;
     }
-    printf(PRI_TREE_TYPE, tnode->data);
-    printf("(");
-    PrefixPrintTree(tnode->left);
-    PrefixPrintTree(tnode->right);
-    printf(")");
+    fprintf(input, "(");
+    fprintf(input, TREE_TYPE_FMT, tnode->data);
+    PrefixPrintTree(input, tnode->left);
+    PrefixPrintTree(input, tnode->right);
+    fprintf(input, ")");
 	return;
 }
 
-void InfixPrintTree(const struct TreeNode *tnode)
+void InfixPrintTree(FILE *input, const struct TreeNode *tnode)
 {
     TREE_ASSERT(tnode);
+    assert(input);
     if (!tnode) {
-        printf("nul");
+        fprintf(input, "nil");
         return;
     }
-    printf("(");
-    InfixPrintTree(tnode->left);
-    printf(")");
-    printf(PRI_TREE_TYPE, tnode->data);
-    printf("(");
-    InfixPrintTree(tnode->right);
-    printf(")");
+    fprintf(input, "(");
+    InfixPrintTree(input, tnode->left);
+    fprintf(input, ")");
+    fprintf(input, TREE_TYPE_FMT, tnode->data);
+    fprintf(input, "(");
+    InfixPrintTree(input, tnode->right);
+    fprintf(input, ")");
     return;
+}
+
+struct ReadTreeRes PrefixReadTree(FILE *input)
+{
+    assert(input);
+    int nread = 0;
+    fscanf(input, "(%n", &nread);
+    if (nread == 0)
+        return {RT_SYNTAX_ERROR, NULL};
+
+    nread = 0;
+    fscanf(input, "nil)%n", &nread);
+    if (nread > 0)
+        return {RT_SUCCESS, NULL};
+
+    struct TreeNode *tnode = TreeNodeCtor();
+    if (fscanf(input, TREE_TYPE_FMT, &tnode->data) <= 0)
+        return {RT_SYNTAX_ERROR, NULL};
+
+    struct ReadTreeRes left_res  = PrefixReadTree(input);
+    struct ReadTreeRes right_res = PrefixReadTree(input);
+    if (left_res.error_state != RT_SUCCESS)
+        return left_res;
+    if (right_res.error_state != RT_SUCCESS)
+        return right_res;
+
+    tnode->left  = left_res.tnode;
+    tnode->right = right_res.tnode;
+    return {RT_SUCCESS, tnode};
 }
 
 #undef TREE_ASSERT

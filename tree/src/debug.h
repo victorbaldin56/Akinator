@@ -14,7 +14,7 @@ void TreeDump(const struct TreeNode *tnode, TreeErrors error_state,
 
 TreeErrors CheckTree(const struct TreeNode *tnode);
 
-void TreePNGDump(const struct TreeNode *tnode, char *png_filename);
+void ImageDump(const struct TreeNode *tnode, char *image_filename);
 
 void DotDump(const struct TreeNode *tnode, FILE *stream);
 

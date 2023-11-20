@@ -6,7 +6,10 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "dot.h"
 #include "tree.h"
+
+const size_t TIMESTAMP_MAX = 16;
 
 TreeErrors CheckTree(const struct TreeNode *tnode)
 {
@@ -32,29 +35,36 @@ void TreeDump(const struct TreeNode *tnode, TreeErrors error_state,
     fprintf(fp, "TreeDump called from function %s, file %s:%zu",
                 func, filename, line);
     fprintf(fp, "ERROR %d", error_state);
-    char png_filename[PATH_MAX] = {};
-    TreePNGDump(tnode, png_filename);
+    char image_filename[PATH_MAX] = {};
+    ImageDump(tnode, image_filename);
     fclose(fp);
 }
 
-void TreePNGDump(const struct TreeNode *tnode, char *png_filename)
+void ImageDump(const struct TreeNode *tnode, char *image_filename)
 {
-    assert(png_filename);
+    assert(image_filename);
     char filename[PATH_MAX] = {};
     time_t now = time(NULL);
-    strftime(filename, sizeof(filename), "%Y-%M-%D_%H:%M:%S.dot", gmtime(&now));
+    char timestamp[TIMESTAMP_MAX] = {};
+    strftime(timestamp, sizeof(timestamp), "%Y_%m_%d_%H:%M:%S", gmtime(&now));
+    snprintf(filename, sizeof(filename), "%s.dot", timestamp);
     FILE *fp = fopen(filename, "w");
     if (!fp) {
-        perror("TreePNGDump");
+        perror("ImageDump");
         return;
     }
+    DotBegin(fp);
     DotDump(tnode, fp);
-    fclose(fp);
+    DotEnd(fp);
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wsign-conversion"
     char *cmd = (char *)calloc(sysconf(_SC_ARG_MAX), sizeof(*cmd));
 
-    // Creates output name and command for GraphViz
-    snprintf(png_filename, PATH_MAX, "%s.png", filename);
-    snprintf(cmd, sysconf(_SC_ARG_MAX), "dot -T png %s -o %s", filename, png_filename);
+    // Creates output file name and command for GraphViz
+    snprintf(image_filename, PATH_MAX, "%s.png", timestamp);
+    snprintf(cmd, sysconf(_SC_ARG_MAX), "dot -T png %s -o %s",
+                                        filename, image_filename);
+#pragma GCC diagnostic pop
     system(cmd);
     free(cmd);
 }
@@ -65,8 +75,11 @@ void DotDump(const struct TreeNode *tnode, FILE *stream)
     if (!tnode)
         return;
 
-    fprintf(stream, "tnode%p [shape = Mrecord, label = \"" PRI_TREE_TYPE
-                    " | %p | %p \"];\n", tnode, tnode->data, tnode->left, tnode->right);
+    fprintf(stream, "tnode%p [shape = Mrecord, label = \"" TREE_TYPE_FMT
+                    " {%p | %p} \"];\n",
+                    tnode, tnode->data, tnode->left, tnode->right);
     DotDump(tnode->left, stream);
     DotDump(tnode->right, stream);
+    fprintf(stream, "tnode%p -> tnode%p; tnode%p -> tnode%p;\n",
+                    tnode, tnode->left, tnode, tnode->right);
 }
