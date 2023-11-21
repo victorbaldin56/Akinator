@@ -37,7 +37,7 @@ SRC_DIRS = src
 SRC = $(wildcard $(SRC_DIRS)/*.cpp)
 OBJS := $(SRC:%.cpp=$(BUILD_DIR)/%.cpp.o)
 
-EXECUTABLE = test
+EXECUTABLE = akinator
 
 $(BUILD_DIR)/$(EXECUTABLE): $(OBJS)
 	@$(CC) $(FLAGS) $(OBJS) -o $(BUILD_DIR)/$(EXECUTABLE)

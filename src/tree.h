@@ -5,8 +5,8 @@
 #include <stdio.h>
 
 // Type-dependent things
-typedef int TreeType;
-#define TREE_TYPE_FMT "%d"
+typedef char * TreeType;
+#define TREE_TYPE_FMT "%s"
 
 struct TreeNode {
     TreeType data;
