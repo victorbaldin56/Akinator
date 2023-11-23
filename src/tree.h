@@ -4,41 +4,31 @@
 #include <stddef.h>
 #include <stdio.h>
 
-// Type-dependent things
-typedef char * TreeType;
-#define TREE_TYPE_FMT "%s"
-
-struct TreeNode {
-    TreeType data;
-    struct TreeNode *left;
-    struct TreeNode *right;
+struct Tree {
+    const char *data;
+    struct Tree *left;
+    struct Tree *right;
 };
 
-struct TreeNode *TreeNodeCtor();
+struct Tree *TreeCtor(const char *name, struct Tree *left, struct Tree *right);
 
-void TreeNodeDtor(struct TreeNode *tnode);
+void TreeDtor(struct Tree *tree);
 
-struct TreeNode *LeftCtor(struct TreeNode *tnode);
+void PrintTree(FILE *output, const struct Tree *tree);
 
-struct TreeNode *RightCtor(struct TreeNode *tnode);
-
-void PostfixPrintTree(FILE *stream, const struct TreeNode *tnode);
-
-void PrefixPrintTree(FILE *stream, const struct TreeNode *tnode);
-
-void InfixPrintTree(FILE *stream, const struct TreeNode *tnode);
-
-enum ReadTreeErrors {
-    RT_BAD_ALLOC    = -2,
-    RT_SYNTAX_ERROR = -1,
-    RT_SUCCESS      =  0,
+enum ReadErrors {
+    RT_OK = 0,
+    RT_BAD_ALLOC,
+    RT_BAD_SYNTAX,
 };
 
-struct ReadTreeRes {
-    ReadTreeErrors error_state;
-    struct TreeNode *tnode;
+char *LoadFile(FILE *input);
+
+struct ReadResult {
+    ReadErrors error;
+    struct Tree *tree;
 };
 
-struct ReadTreeRes PrefixReadTree(FILE *input);
+struct ReadResult ReadTree(char **buf);
 
 #endif

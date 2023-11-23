@@ -36,16 +36,18 @@ BUILD_DIR = build
 SRC_DIRS = src
 SRC = $(wildcard $(SRC_DIRS)/*.cpp)
 OBJS := $(SRC:%.cpp=$(BUILD_DIR)/%.cpp.o)
+INCLUDE = stack/src
+LIB = stack/build/stack.a
 
 EXECUTABLE = akinator
 
 $(BUILD_DIR)/$(EXECUTABLE): $(OBJS)
-	@$(CC) $(FLAGS) $(OBJS) -o $(BUILD_DIR)/$(EXECUTABLE)
+	@$(CC) $(FLAGS) $(OBJS) $(LIB) -o $(BUILD_DIR)/$(EXECUTABLE) -I $(INCLUDE)
 
 $(BUILD_DIR)/%.cpp.o: %.cpp
 	@mkdir -p $(BUILD_DIR)
 	@mkdir -p $(BUILD_DIR)/$(SRC_DIRS)
-	@$(CC) $(FLAGS) -c $< -o $@
+	@$(CC) $(FLAGS) -c $< -o $@ -I $(INCLUDE)
 
 .PHONY: clean
 

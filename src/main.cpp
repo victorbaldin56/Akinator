@@ -1,43 +1,45 @@
 #include <stdio.h>
 
 #include <assert.h>
+#include <stdlib.h>
 
 #include "debug.h"
 #include "tree.h"
 
 int main()
 {
-	FILE *input = fopen("tests/input.txt", "r");
-	if (!input) {
-		perror("");
-		return -1;
-	}
+	struct Tree *tree = TreeCtor("root", NULL, NULL);
+	struct Tree *left = TreeCtor("left child", NULL, NULL);
+	struct Tree *right = TreeCtor("right child", NULL, NULL);
+	tree->left = left;
+	tree->right = right;
 
-	struct ReadTreeRes read_res = PrefixReadTree(input);
-	switch (read_res.error_state) {
-		case RT_BAD_ALLOC: {
-			fprintf(stderr, "allocation failed\n");
-			return -1;
-		}
-		case RT_SYNTAX_ERROR: {
-			fprintf(stderr, "syntax error\n");
-			return -1;
-		}
-		case RT_SUCCESS: {
-			fprintf(stderr, "success\n");
-			break;
-		}
-		default: {
-			assert(0);
-		}
-	}
-	FILE *output = fopen("tests/output.txt", "w");
-	if (!output) {
-		perror("");
-		return -1;
-	}
-	PrefixPrintTree(output, read_res.tnode);
-	TreeNodeDtor(read_res.tnode);
+	struct Tree *leftleft = TreeCtor("left child of left child", NULL, NULL);
+	tree->left->left = leftleft;
+	struct Tree *leftright = TreeCtor("right child of left child", NULL, NULL);
+	tree->left->right = leftright;
+
+	struct Tree *rightleft = TreeCtor("aboba", NULL, NULL);
+	struct Tree *rightright = TreeCtor("ded", NULL, NULL);
+	tree->right->right = rightright;
+	tree->right->left = rightleft;
+
+	struct Tree *subtree = TreeCtor("some shit here", NULL, NULL);
+	leftleft->right = subtree;
+	DUMP_TREE(tree);
+	FILE *fp = fopen("tests/base.txt", "w");
+	PrintTree(fp, tree);
+	fclose(fp);
+	TreeDtor(tree);
+
+	fp = fopen("tests/base.txt", "r");
+	char *buf = LoadFile(fp);
+    char *origbuf = buf;
+	struct ReadResult res = ReadTree(&buf);
+	struct Tree *new_tree = res.tree;
+	DUMP_TREE(new_tree);
+	new_tree->left->right = new_tree;
+	TreeDtor(new_tree);
+	free(origbuf);
 	return 0;
 }
-

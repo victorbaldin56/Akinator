@@ -2,6 +2,7 @@
 build
 logs
 html
+.vscode
 
 *.o
 *.a

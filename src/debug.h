@@ -1,21 +1,77 @@
-#ifndef AKINATOR_TREE_DEBUG_H_
-#define AKINATOR_TREE_DEBUG_H_
+#ifndef AKINATOR_DEBUG_H_
+#define AKINATOR_DEBUG_H_
 
-#include <stdio.h>
+#include <limits.h>
+
+#include "stack.h"
+#include "tree.h"
 
 enum TreeErrors {
     TREE_OK = 0,
-    TREE_LEFT_RIGHT_EQUAL,
-    TREE_SELF_REFERENCED,
+    TREE_CHILD_OVERLAP,
+    TREE_HAS_CYCLE,
+    TREE_CHECK_FAILURE,
 };
 
-void TreeDump(const struct TreeNode *tnode, TreeErrors error_state,
-              const char *filename, const char *func, size_t line);
+struct TreeState {
+    TreeErrors error;
+    const struct Tree *wrong_parent;
+    const struct Tree *wrong_child;
+};
 
-TreeErrors CheckTree(const struct TreeNode *tnode);
+struct TreeState CheckNode(const struct Tree *tree, Stack *stk);
 
-void ImageDump(const struct TreeNode *tnode, char *image_filename);
+inline struct TreeState CheckTree(const struct Tree *tree)
+{
+    Stack stk = {};
+    StackCtor(&stk);
+    TreeState state = CheckNode(tree, &stk);
+    StackDtor(&stk);
+    return state;
+}
 
-void DotDump(const struct TreeNode *tnode, FILE *stream);
+struct CallPosition {
+    const char *file;
+    const char *func;
+    size_t line;
+    const char *varname;
+};
+
+struct DotFile {
+    FILE *stream;
+    char name[PATH_MAX];
+};
+
+struct DotFile CreateDotFile();
+
+void RunDot(struct DotFile dot);
+
+void DumpTree(const struct Tree *tree, struct TreeState state,
+              const char *filename, struct CallPosition pos);
+
+#ifndef NDEBUG
+#define DUMP_TREE(tree) \
+    do { \
+        TreeState state = CheckTree(tree); \
+        DumpTree(tree, state, "log.html", {__FILE__, __func__, \
+                 __LINE__, #tree}); \
+    } while (0)
+
+#define TREE_ASSERT(tree) \
+    do { \
+        TreeState state = CheckTree(tree); \
+        if (state.error != TREE_OK) { \
+            DumpTree(tree, state, "log.html", \
+                     {__FILE__, __func__, __LINE__, #tree}); \
+            fprintf(stderr, "CheckTree failed: %s:%s:%d\n", \
+                            __FILE__, __func__, __LINE__); \
+            abort(); \
+		} \
+    } while (0)
+#else
+#define DUMP_TREE(tree)
+
+#define TREE_ASSERT(tree)
+#endif
 
 #endif

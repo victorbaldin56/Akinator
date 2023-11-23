@@ -1,0 +1,26 @@
+(root
+(left child
+(left child of left child
+()
+(some shit here
+()
+()
+
+)
+)(right child of left child
+()
+()
+
+)
+)(right child
+(aboba
+()
+()
+
+)(ded
+()
+()
+
+)
+)
+)

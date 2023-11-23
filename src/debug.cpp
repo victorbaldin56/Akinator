@@ -3,83 +3,210 @@
 #include <assert.h>
 #include <limits.h>
 #include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
 #include <time.h>
-#include <unistd.h>
 
-#include "dot.h"
 #include "tree.h"
 
-const size_t TIMESTAMP_MAX = 16;
+#define PATH_TO_LOGS "logs/"
 
-TreeErrors CheckTree(const struct TreeNode *tnode)
+// Linear search of tree node in stack to check for cycling in tree
+static inline bool InStack(Elem_t value, const Stack *stk);
+
+struct TreeState CheckNode(const struct Tree *tree, Stack *stk)
 {
-    if (!tnode)
-        return TREE_OK;
-    if (tnode->left != NULL && tnode->left == tnode->right)
-        return TREE_LEFT_RIGHT_EQUAL;
-    if (tnode->left == tnode || tnode->right == tnode)
-        return TREE_SELF_REFERENCED;
+    STACK_ASS(stk);
+    if (!tree) {
+        return {TREE_OK};
+    }
 
-    return TREE_OK;
+    if (Push(stk, tree) == REALLOC_FAILED) {
+        return {TREE_CHECK_FAILURE};
+    }
+
+    if (InStack(tree->left, stk)) {
+        return {TREE_HAS_CYCLE, tree, tree->left};
+    }
+
+    if (InStack(tree->right, stk)) {
+        return {TREE_HAS_CYCLE, tree, tree->right};
+    }
+
+    if (tree->left != NULL && tree->left == tree->right) {
+        return {TREE_CHILD_OVERLAP, tree, tree->left};
+    }
+
+    TreeState left_state  = CheckNode(tree->left, stk);
+    TreeState right_state = CheckNode(tree->right, stk);
+    if (left_state.error != TREE_OK)
+        return left_state;
+    if (right_state.error != TREE_OK)
+        return right_state;
+
+    return {TREE_OK, NULL};
 }
 
-void TreeDump(const struct TreeNode *tnode, TreeErrors error_state,
-              const char *filename, const char *func, size_t line)
+static inline bool InStack(Elem_t value, const Stack *stk)
 {
-    system("mkdir -p logs");
-    FILE *fp = fopen("logs/dump.html", "w+");
-    if (!fp) {
-        perror("TreeDump");
+    for (ssize_t i = 0; i < stk->size; i++) {
+        if (value == stk->data[i])
+            return true;
+    }
+    return false;
+}
+
+static inline void PrintHeader(struct TreeState state, FILE *output,
+                               struct CallPosition pos);
+
+static void PrintState(struct TreeState state, FILE *output);
+
+static inline void DumpToDot(const struct Tree *tree, struct TreeState state,
+                             struct DotFile dot);
+
+static void DumpNode(const struct Tree *tree, TreeState state,
+                     struct DotFile dot);
+
+void DumpTree(const struct Tree *tree, struct TreeState state,
+              const char *filename, struct CallPosition pos)
+{
+    assert(filename);
+    assert(pos.file && pos.func);
+    system("mkdir -p " PATH_TO_LOGS);
+
+    char full_path[PATH_MAX] = {};
+    snprintf(full_path, sizeof(full_path), PATH_TO_LOGS "%s", filename);
+    FILE *output = fopen(full_path, "a+");
+    if (!output) {
+        perror("DumpTree");
         return;
     }
-    fprintf(fp, "TreeDump called from function %s, file %s:%zu",
-                func, filename, line);
-    fprintf(fp, "ERROR %d", error_state);
-    char image_filename[PATH_MAX] = {};
-    ImageDump(tnode, image_filename);
-    fclose(fp);
+    PrintHeader(state, output, pos);
+    struct DotFile dot = CreateDotFile();
+    if (!dot.stream) {
+        perror("CreateLogFile");
+        return;
+    }
+    DumpToDot(tree, state, dot);
+    RunDot(dot);
+    fprintf(output, "<img\n"
+                    "   src = %s.png\n"
+                    "/>\n", dot.name + sizeof(PATH_TO_LOGS) - 1);
+    fclose(output);
 }
 
-void ImageDump(const struct TreeNode *tnode, char *image_filename)
+struct DotFile CreateDotFile()
 {
-    assert(image_filename);
-    char filename[PATH_MAX] = {};
+    DotFile dot = {};
     time_t now = time(NULL);
-    char timestamp[TIMESTAMP_MAX] = {};
-    strftime(timestamp, sizeof(timestamp), "%Y_%m_%d_%H:%M:%S", gmtime(&now));
-    snprintf(filename, sizeof(filename), "%s.dot", timestamp);
-    FILE *fp = fopen(filename, "w");
-    if (!fp) {
-        perror("ImageDump");
-        return;
-    }
-    DotBegin(fp);
-    DotDump(tnode, fp);
-    DotEnd(fp);
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wsign-conversion"
-    char *cmd = (char *)calloc(sysconf(_SC_ARG_MAX), sizeof(*cmd));
+    char filename[PATH_MAX] = {};
+    strftime(filename, sizeof(filename), PATH_TO_LOGS "%Y-%m-%d_%H-%M-%S",
+                                         gmtime(&now));
+    struct timespec ts = {};
+    timespec_get(&ts, TIME_UTC);
+    snprintf(dot.name, sizeof(dot.name), "%s.%ld", filename, ts.tv_nsec);
+    dot.stream = fopen(dot.name, "w");
+    return dot;
+}
 
-    // Creates output file name and command for GraphViz
-    snprintf(image_filename, PATH_MAX, "%s.png", timestamp);
-    snprintf(cmd, sysconf(_SC_ARG_MAX), "dot -T png %s -o %s",
-                                        filename, image_filename);
-#pragma GCC diagnostic pop
+static inline void PrintHeader(struct TreeState state, FILE *output,
+                               struct CallPosition pos)
+{
+    assert(output);
+    assert(pos.file && pos.func && pos.varname);
+    fprintf(output, "<h2>Tree <code>%s</code> from file"
+                    " %s, function <code>%s</code>, line %zu</h2>\n",
+                    pos.varname, pos.file, pos.func, pos.line);
+    PrintState(state, output);
+}
+
+static void PrintState(struct TreeState state, FILE *output)
+{
+    assert(output);
+    switch (state.error) {
+        case TREE_OK: {
+            fprintf(output, "<font color = green>"
+                            "No errors detected, tree is OK!\n"
+                            "</font>");
+            return;
+        }
+        case TREE_CHILD_OVERLAP: {
+            fprintf(output, "<font color = red>"
+                            "ERROR in node %p: left = right\n"
+                            "</font>", state.wrong_parent);
+            return;
+        }
+        case TREE_HAS_CYCLE: {
+            fprintf(output, "<font color = red>"
+                            "ERROR in node %p: tree has cycle\n"
+                            "</font>", state.wrong_parent);
+            return;
+        }
+        case TREE_CHECK_FAILURE: {
+            fprintf(output, "Could not check tree due to memory limit\n");
+            return;
+        }
+        default: {
+            assert(0);
+        }
+    }
+}
+
+static inline void DumpToDot(const struct Tree *tree, struct TreeState state,
+                      struct DotFile dot)
+{
+    assert(dot.stream && dot.name);
+    if (!tree)
+        return;
+
+    fprintf(dot.stream, "digraph G {\n");
+    DumpNode(tree, state, dot);
+    fprintf(dot.stream, "}\n");
+}
+
+static inline void PrintDotNode(const struct Tree *tree, struct DotFile dot,
+                                const char *color)
+{
+    assert(dot.stream && dot.name);
+    fprintf(dot.stream, "    t%p[shape = Mrecord, style = filled, "
+                        "fillcolor = %s, label = \"%s\"];\n",
+                        tree, color, tree->data);
+}
+
+static void DumpNode(const struct Tree *tree, struct TreeState state,
+                     struct DotFile dot)
+{
+    assert(dot.stream && dot.name);
+    if (!tree)
+        return;
+
+    if (tree == state.wrong_parent) {
+        PrintDotNode(tree, dot, "red");
+        if (state.error == TREE_HAS_CYCLE) {
+            fprintf(dot.stream, "    t%p->t%p\n", tree, state.wrong_child);
+            return;
+        }
+    } else {
+        PrintDotNode(tree, dot, "cyan");
+    }
+
+    DumpNode(tree->left, state, dot);
+    DumpNode(tree->right, state, dot);
+    if (tree->left)
+        fprintf(dot.stream, "    t%p->t%p[weight = 1000]\n", tree, tree->left);
+    if (tree->right)
+        fprintf(dot.stream, "    t%p->t%p[weight = 1000]\n", tree, tree->right);
+}
+
+const size_t MAX_COMMAND_SIZE = 10000;
+
+void RunDot(struct DotFile dot)
+{
+    assert(dot.stream && dot.name);
+    fclose(dot.stream);
+    char *cmd = (char *)calloc(MAX_COMMAND_SIZE, sizeof(*cmd));
+    snprintf(cmd, MAX_COMMAND_SIZE, "dot -T png %s -o %s.png",
+                                    dot.name, dot.name);
     system(cmd);
     free(cmd);
-}
-
-void DotDump(const struct TreeNode *tnode, FILE *stream)
-{
-    assert(stream);
-    if (!tnode)
-        return;
-
-    fprintf(stream, "tnode%p [shape = Mrecord, label = \"" TREE_TYPE_FMT
-                    " {%p | %p} \"];\n",
-                    tnode, tnode->data, tnode->left, tnode->right);
-    DotDump(tnode->left, stream);
-    DotDump(tnode->right, stream);
-    fprintf(stream, "tnode%p -> tnode%p; tnode%p -> tnode%p;\n",
-                    tnode, tnode->left, tnode, tnode->right);
 }
