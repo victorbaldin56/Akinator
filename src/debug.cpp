@@ -56,10 +56,10 @@ static inline bool InStack(Elem_t value, const Stack *stk)
     return false;
 }
 
-static inline void PrintHeader(struct TreeState state, FILE *output,
+static inline void DumpHeader(struct TreeState state, FILE *output,
                                struct CallPosition pos);
 
-static void PrintState(struct TreeState state, FILE *output);
+static void DumpState(struct TreeState state, FILE *output);
 
 static inline void DumpToDot(const struct Tree *tree, struct TreeState state,
                              struct DotFile dot);
@@ -67,6 +67,7 @@ static inline void DumpToDot(const struct Tree *tree, struct TreeState state,
 static void DumpNode(const struct Tree *tree, TreeState state,
                      struct DotFile dot);
 
+// TODO release
 void DumpTree(const struct Tree *tree, struct TreeState state,
               const char *filename, struct CallPosition pos)
 {
@@ -81,7 +82,7 @@ void DumpTree(const struct Tree *tree, struct TreeState state,
         perror("DumpTree");
         return;
     }
-    PrintHeader(state, output, pos);
+    DumpHeader(state, output, pos);
     struct DotFile dot = CreateDotFile();
     if (!dot.stream) {
         perror("CreateLogFile");
@@ -95,21 +96,24 @@ void DumpTree(const struct Tree *tree, struct TreeState state,
     fclose(output);
 }
 
+const size_t MAX_TIMESTAMP_SIZE = 30;
+
+// FIXME direct copying
 struct DotFile CreateDotFile()
 {
     DotFile dot = {};
     time_t now = time(NULL);
-    char filename[PATH_MAX] = {};
-    strftime(filename, sizeof(filename), PATH_TO_LOGS "%Y-%m-%d_%H-%M-%S",
-                                         gmtime(&now));
+    char timestamp[MAX_TIMESTAMP_SIZE] = {};
+    strftime(timestamp, sizeof(timestamp), "%Y-%m-%d_%H-%M-%S", gmtime(&now));
     struct timespec ts = {};
     timespec_get(&ts, TIME_UTC);
-    snprintf(dot.name, sizeof(dot.name), "%s.%ld", filename, ts.tv_nsec);
+    snprintf(dot.name, sizeof(dot.name), PATH_TO_LOGS "%s.%ld",
+                                         timestamp, ts.tv_nsec);
     dot.stream = fopen(dot.name, "w");
     return dot;
 }
 
-static inline void PrintHeader(struct TreeState state, FILE *output,
+static inline void DumpHeader(struct TreeState state, FILE *output,
                                struct CallPosition pos)
 {
     assert(output);
@@ -117,10 +121,10 @@ static inline void PrintHeader(struct TreeState state, FILE *output,
     fprintf(output, "<h2>Tree <code>%s</code> from file"
                     " %s, function <code>%s</code>, line %zu</h2>\n",
                     pos.varname, pos.file, pos.func, pos.line);
-    PrintState(state, output);
+    DumpState(state, output);
 }
 
-static void PrintState(struct TreeState state, FILE *output)
+static void DumpState(struct TreeState state, FILE *output)
 {
     assert(output);
     switch (state.error) {
@@ -147,13 +151,13 @@ static void PrintState(struct TreeState state, FILE *output)
             return;
         }
         default: {
-            assert(0);
+            assert(0 && "Unhandled enum value");
         }
     }
 }
 
 static inline void DumpToDot(const struct Tree *tree, struct TreeState state,
-                      struct DotFile dot)
+                             struct DotFile dot)
 {
     assert(dot.stream && dot.name);
     if (!tree)

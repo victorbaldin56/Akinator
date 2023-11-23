@@ -16,19 +16,17 @@ void TreeDtor(struct Tree *tree);
 
 void PrintTree(FILE *output, const struct Tree *tree);
 
-enum ReadErrors {
-    RT_OK = 0,
-    RT_BAD_ALLOC,
-    RT_BAD_SYNTAX,
+enum ReadTreeErrors {
+    RT_OK         = 0,
+    RT_BAD_ALLOC  = 1,
+    RT_BAD_SYNTAX = 2,
 };
 
-char *LoadFile(FILE *input);
-
-struct ReadResult {
-    ReadErrors error;
+struct ReadTreeResult {
+    ReadTreeErrors error;
     struct Tree *tree;
 };
 
-struct ReadResult ReadTree(char **buf);
+struct ReadTreeResult ReadTree(char *buf);
 
 #endif

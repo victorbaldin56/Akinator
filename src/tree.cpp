@@ -44,47 +44,40 @@ void PrintTree(FILE *output, const struct Tree *tree)
     fprintf(output, "\n)");
 }
 
-char *LoadFile(FILE *input)
-{
-    assert(input);
-    fseek(input, 0L, SEEK_END);
-    long size = ftell(input);
-    fseek(input, 0L, SEEK_SET);
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wsign-conversion"
-    char *buf = (char *)calloc(size + 1, sizeof(*buf));
-    if (!buf)
-        return NULL;
+static struct ReadTreeResult ParseBaseBuffer(char **bufp);
 
-    fread(buf, size, sizeof(*buf), input);
-#pragma GCC diagnostic pop
-    return buf;
+struct ReadTreeResult ReadTree(char *buf)
+{
+    return ParseBaseBuffer(&buf);
 }
 
-struct ReadResult ReadTree(char **buf)
+// FIXME
+static struct ReadTreeResult ParseBaseBuffer(char **bufp)
 {
-    assert(buf && *buf);
-    *buf = strchr(*buf, '(');
-    if (!buf)
+    assert(bufp && *bufp);
+    *bufp = strchr(*bufp, '(');
+    if (!*bufp)
         return {RT_BAD_SYNTAX};
 
-    **buf = '\0';
-    if (*++*buf == ')')
+    **bufp = '\0';
+    if (*++*bufp == ')')
         return {RT_OK};
 
-    struct Tree *tree = TreeCtor(*buf, NULL, NULL);
+    struct Tree *tree = TreeCtor(*bufp, NULL, NULL);
     if (!tree)
         return {RT_BAD_ALLOC};
 
-    struct ReadResult left_res = ReadTree(buf);
+    struct ReadTreeResult left_res = ParseBaseBuffer(bufp);
     tree->left = left_res.tree;
-    if (left_res.error)
+    if (left_res.error) {
+        TreeDtor(tree);
         return left_res;
-
-    struct ReadResult right_res = ReadTree(buf);
+    }
+    struct ReadTreeResult right_res = ParseBaseBuffer(bufp);
     tree->right = right_res.tree;
-    if (right_res.error)
+    if (right_res.error) {
+        TreeDtor(tree);
         return right_res;
-
+    }
     return {RT_OK, tree};
 }

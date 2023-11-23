@@ -37,9 +37,11 @@ struct CallPosition {
     const char *varname;
 };
 
+const size_t MAX_LOG_PATH_SIZE = 1024;
+
 struct DotFile {
     FILE *stream;
-    char name[PATH_MAX];
+    char name[MAX_LOG_PATH_SIZE];
 };
 
 struct DotFile CreateDotFile();

@@ -1,17 +1,13 @@
 #ifndef AKINATOR_AKINATOR_H_
 #define AKINATOR_AKINATOR_H_
 
-#include "tree.h"
-
-enum LoadBaseErrors {
-    LB_OK = 0,
-    LB_FILE_NOT_FOUND,
-    LB_BAD_ALLOC,
-    LB_BAD_SYNTAX,
+enum LoadFileErrors {
+    LF_OK               =  0,
+    LF_FILE_NOT_FOUND   = -1,
+    LF_FILE_PERM_DENIED = -2,
+    LF_BAD_ALLOC        = -3,
 };
 
-LoadBaseErrors LoadBase(char *filename);
-
-
+int ExecProcess(const char *filename);
 
 #endif
