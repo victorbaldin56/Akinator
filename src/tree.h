@@ -8,13 +8,16 @@ struct Tree {
     const char *data;
     struct Tree *left;
     struct Tree *right;
+#ifndef NDEBUG
+    bool is_visited; ///< For verificator
+#endif
 };
 
 struct Tree *TreeCtor(const char *name, struct Tree *left, struct Tree *right);
 
 void TreeDtor(struct Tree *tree);
 
-void PrintTree(FILE *output, const struct Tree *tree);
+void PrintTree(FILE *output, struct Tree *tree);
 
 enum ReadTreeErrors {
     RT_OK         = 0,

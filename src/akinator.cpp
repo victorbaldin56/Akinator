@@ -14,9 +14,9 @@ static void PrintLoadFileError(LoadFileErrors lf_error);
 
 static void PrintReadTreeError(ReadTreeErrors rt_error);
 
-static void TraverseTree(const struct Tree *tree);
+static void TraverseTree(struct Tree *tree);
 
-static inline struct Tree *SelectNextNode(const struct Tree *tree);
+static inline struct Tree *SelectNextNode(struct Tree *tree);
 
 // TODO guess
 // TODO defintion
@@ -107,7 +107,7 @@ static void PrintReadTreeError(ReadTreeErrors rt_error)
     }
 }
 
-static void TraverseTree(const struct Tree *tree)
+static void TraverseTree(struct Tree *tree)
 {
     TREE_ASSERT(tree);
     if (!tree) {
@@ -117,7 +117,7 @@ static void TraverseTree(const struct Tree *tree)
     TraverseTree(SelectNextNode(tree));
 }
 
-static inline struct Tree *SelectNextNode(const struct Tree *tree)
+static inline struct Tree *SelectNextNode(struct Tree *tree)
 {
     TREE_ASSERT(tree);
     if (!tree)

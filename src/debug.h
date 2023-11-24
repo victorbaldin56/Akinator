@@ -15,20 +15,13 @@ enum TreeErrors {
 
 struct TreeState {
     TreeErrors error;
-    const struct Tree *wrong_parent;
-    const struct Tree *wrong_child;
+    struct Tree *wrong_parent;
+    struct Tree *wrong_child;
 };
 
-struct TreeState CheckNode(const struct Tree *tree, Stack *stk);
+struct TreeState CheckTree(struct Tree *tree);
 
-inline struct TreeState CheckTree(const struct Tree *tree)
-{
-    Stack stk = {};
-    StackCtor(&stk);
-    TreeState state = CheckNode(tree, &stk);
-    StackDtor(&stk);
-    return state;
-}
+void ResetTree(struct Tree *tree);
 
 struct CallPosition {
     const char *file;
@@ -57,6 +50,7 @@ void DumpTree(const struct Tree *tree, struct TreeState state,
         TreeState state = CheckTree(tree); \
         DumpTree(tree, state, "log.html", {__FILE__, __func__, \
                  __LINE__, #tree}); \
+        ResetTree(tree); \
     } while (0)
 
 #define TREE_ASSERT(tree) \
@@ -69,6 +63,7 @@ void DumpTree(const struct Tree *tree, struct TreeState state,
                             __FILE__, __func__, __LINE__); \
             abort(); \
 		} \
+        ResetTree(tree); \
     } while (0)
 #else
 #define DUMP_TREE(tree)

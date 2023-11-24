@@ -11,58 +11,48 @@
 
 #define PATH_TO_LOGS "logs/"
 
-// Linear search of tree node in stack to check for cycling in tree
-static inline bool InStack(Elem_t value, const Stack *stk);
-
-struct TreeState CheckNode(const struct Tree *tree, Stack *stk)
+struct TreeState CheckTree(struct Tree *tree)
 {
-    STACK_ASS(stk);
     if (!tree) {
         return {TREE_OK};
     }
-
-    if (Push(stk, tree) == REALLOC_FAILED) {
-        return {TREE_CHECK_FAILURE};
-    }
-
-    if (InStack(tree->left, stk)) {
+    tree->is_visited = true;
+    if (tree->left && tree->left->is_visited) {
         return {TREE_HAS_CYCLE, tree, tree->left};
     }
-
-    if (InStack(tree->right, stk)) {
+    if (tree->right && tree->right->is_visited) {
         return {TREE_HAS_CYCLE, tree, tree->right};
     }
-
     if (tree->left != NULL && tree->left == tree->right) {
         return {TREE_CHILD_OVERLAP, tree, tree->left};
     }
-
-    TreeState left_state  = CheckNode(tree->left, stk);
-    TreeState right_state = CheckNode(tree->right, stk);
+    TreeState left_state  = CheckTree(tree->left);
+    TreeState right_state = CheckTree(tree->right);
     if (left_state.error != TREE_OK)
         return left_state;
     if (right_state.error != TREE_OK)
         return right_state;
 
-    return {TREE_OK, NULL};
+    return {TREE_OK};
 }
 
-static inline bool InStack(Elem_t value, const Stack *stk)
+void ResetTree(struct Tree *tree)
 {
-    for (ssize_t i = 0; i < stk->size; i++) {
-        if (value == stk->data[i])
-            return true;
-    }
-    return false;
+    if (!tree)
+        return;
+
+    tree->is_visited = false;
+    ResetTree(tree->left);
+    ResetTree(tree->right);
 }
 
-static inline void DumpHeader(struct TreeState state, FILE *output,
-                               struct CallPosition pos);
+static void DumpHeader(struct TreeState state, FILE *output,
+                       struct CallPosition pos);
 
 static void DumpState(struct TreeState state, FILE *output);
 
-static inline void DumpToDot(const struct Tree *tree, struct TreeState state,
-                             struct DotFile dot);
+static void DumpToDot(const struct Tree *tree, struct TreeState state,
+                      struct DotFile dot);
 
 static void DumpNode(const struct Tree *tree, TreeState state,
                      struct DotFile dot);
@@ -113,8 +103,8 @@ struct DotFile CreateDotFile()
     return dot;
 }
 
-static inline void DumpHeader(struct TreeState state, FILE *output,
-                               struct CallPosition pos)
+static void DumpHeader(struct TreeState state, FILE *output,
+                       struct CallPosition pos)
 {
     assert(output);
     assert(pos.file && pos.func && pos.varname);

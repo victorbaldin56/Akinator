@@ -30,7 +30,7 @@ void TreeDtor(struct Tree *tree)
     free(tree);
 }
 
-void PrintTree(FILE *output, const struct Tree *tree)
+void PrintTree(FILE *output, struct Tree *tree)
 {
     assert(output);
     TREE_ASSERT(tree);
