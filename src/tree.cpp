@@ -51,7 +51,6 @@ struct ReadTreeResult ReadTree(char *buf)
     return ParseBaseBuffer(&buf);
 }
 
-// FIXME
 static struct ReadTreeResult ParseBaseBuffer(char **bufp)
 {
     assert(bufp && *bufp);

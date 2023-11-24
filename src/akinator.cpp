@@ -14,9 +14,19 @@ static void PrintLoadFileError(LoadFileErrors lf_error);
 
 static void PrintReadTreeError(ReadTreeErrors rt_error);
 
-static void TraverseTree(struct Tree *tree);
+const size_t MAX_OBJECT_NAME_SIZE = 1024;
+const int GO_DIDNT_GUESS = -1;
 
-static struct Tree *SelectNextNode(struct Tree *tree);
+static int GuessObject(struct Tree *root, struct Tree *tree,
+                       const char *pathname);
+
+static bool IsGuessed(struct Tree *tree);
+
+static void AddNewObject(struct Tree *root, struct Tree *tree,
+                         struct Tree *old_obj, const char *pathname);
+
+static void AddToTree(struct Tree *tree, struct Tree *old_obj,
+                      const char *new_obj_name, const char *obj_diff_name);
 
 // TODO guess
 // TODO defintion
@@ -35,8 +45,8 @@ int ExecProcess(const char *pathname)
         PrintReadTreeError(rtres.error);
         goto ret;
     }
-    TraverseTree(rtres.tree);
     DUMP_TREE(rtres.tree);
+    GuessObject(rtres.tree, rtres.tree, pathname);
     TreeDtor(rtres.tree);
 ret:
     free(buf);
@@ -108,33 +118,85 @@ static void PrintReadTreeError(ReadTreeErrors rt_error)
     }
 }
 
-static void TraverseTree(struct Tree *tree)
+static int GuessObject(struct Tree *root, struct Tree *tree,
+                       const char *pathname)
 {
-    TREE_ASSERT(tree);
+    TREE_ASSERT(root);
+    assert(pathname);
     if (!tree) {
         printf("I guessed successfully\n");
-        return;
+        return 0;
     }
-    TraverseTree(SelectNextNode(tree));
+    bool is_guessed = IsGuessed(tree);
+    struct Tree *next = NULL;
+    if (is_guessed)
+        next = tree->left;
+    else
+        next = tree->right;
+
+    if (!next && !is_guessed)
+        return GO_DIDNT_GUESS;
+
+    if (GuessObject(root, next, pathname) == GO_DIDNT_GUESS)
+        AddNewObject(root, tree, next, pathname);
+
+    return 0;
 }
 
-static struct Tree *SelectNextNode(struct Tree *tree)
+static bool IsGuessed(struct Tree *tree)
 {
     TREE_ASSERT(tree);
     if (!tree)
-        return NULL;
+        return false;
 
     assert(tree->data);
     printf("%s? [Y/n] ", tree->data);
-    switch (getchar()) {
+    int ch = getchar();
+    getchar();
+    switch (ch) {
         case 'Y':
-        case 'y': {
-            getchar();
-            return tree->left;
-        }
-        default: {
-            getchar();
-            return tree->right;
-        }
+        case 'y':
+            return true;
+        default:
+            return false;
     }
+}
+
+static void AddNewObject(struct Tree *root, struct Tree *tree,
+                         struct Tree *old_obj, const char *pathname)
+{
+    assert(tree && old_obj);
+    TREE_ASSERT(root);
+    assert(pathname);
+
+    printf("What's this? ");
+    char new_obj_name[MAX_OBJECT_NAME_SIZE] = {};
+    fgets(new_obj_name, sizeof(new_obj_name) - 1, stdin);
+    new_obj_name[sizeof(new_obj_name) - 2] = '\0'; // FIXME
+
+    printf("How's %s different from %s? ", new_obj_name, old_obj->data);
+    char obj_diff_name[MAX_OBJECT_NAME_SIZE] = {};
+    fgets(obj_diff_name, sizeof(obj_diff_name) - 1, stdin);
+    obj_diff_name[sizeof(obj_diff_name) - 2] = '\0'; // FIXME
+
+    AddToTree(tree, old_obj, new_obj_name, obj_diff_name);
+    FILE *output = fopen(pathname, "w");
+    if (!output) {
+        perror(""); // FIXME error code
+        return;
+    }
+    DUMP_TREE(root);
+    PrintTree(output, root);
+}
+
+static void AddToTree(struct Tree *tree, struct Tree *old_obj,
+                      const char *new_obj_name, const char *obj_diff_name)
+{
+    assert(tree && old_obj && new_obj_name && obj_diff_name);
+    struct Tree *new_obj  = TreeCtor(new_obj_name, NULL, NULL); // FIXME alloc
+    struct Tree *obj_diff = TreeCtor(obj_diff_name, new_obj, old_obj);
+    if (old_obj == tree->left)
+        tree->left = obj_diff;
+    else
+        tree->right = obj_diff;
 }
