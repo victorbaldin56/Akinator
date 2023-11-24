@@ -150,7 +150,7 @@ static bool IsGuessed(struct Tree *tree)
         return false;
 
     assert(tree->data);
-    printf("%s? [Y/n] ", tree->data);
+    printf("Это %s? [Y/n] ", tree->data);
     int ch = getchar();
     getchar();
     switch (ch) {
@@ -169,12 +169,12 @@ static void AddNewObject(struct Tree *root, struct Tree *tree,
     TREE_ASSERT(root);
     assert(pathname);
 
-    printf("What's this? ");
+    printf("Что это? ");
     char new_obj_name[MAX_OBJECT_NAME_SIZE] = {};
     fgets(new_obj_name, sizeof(new_obj_name) - 1, stdin);
     new_obj_name[sizeof(new_obj_name) - 2] = '\0'; // FIXME
 
-    printf("How's %s different from %s? ", new_obj_name, old_obj->data);
+    printf("Чем %s отличается от %s? ", new_obj_name, old_obj->data);
     char obj_diff_name[MAX_OBJECT_NAME_SIZE] = {};
     fgets(obj_diff_name, sizeof(obj_diff_name) - 1, stdin);
     obj_diff_name[sizeof(obj_diff_name) - 2] = '\0'; // FIXME
