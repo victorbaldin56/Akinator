@@ -16,7 +16,7 @@ static void PrintReadTreeError(ReadTreeErrors rt_error);
 
 static void TraverseTree(struct Tree *tree);
 
-static inline struct Tree *SelectNextNode(struct Tree *tree);
+static struct Tree *SelectNextNode(struct Tree *tree);
 
 // TODO guess
 // TODO defintion
@@ -63,6 +63,7 @@ static LoadFileErrors LoadFile(const char *pathname, char **bufptr)
 
     fread(*bufptr, statbuf.st_size, sizeof(**bufptr), input);
 #pragma GCC diagnostic pop
+    fclose(input);
     return LF_OK;
 }
 
@@ -117,7 +118,7 @@ static void TraverseTree(struct Tree *tree)
     TraverseTree(SelectNextNode(tree));
 }
 
-static inline struct Tree *SelectNextNode(struct Tree *tree)
+static struct Tree *SelectNextNode(struct Tree *tree)
 {
     TREE_ASSERT(tree);
     if (!tree)

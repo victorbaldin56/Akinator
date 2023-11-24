@@ -35,13 +35,13 @@ void PrintTree(FILE *output, struct Tree *tree)
     assert(output);
     TREE_ASSERT(tree);
     if (!tree) {
-        fprintf(output, "()\n");
+        fprintf(output, "()");
         return;
     }
-    fprintf(output, "(%s\n", tree->data);
+    fprintf(output, "(%s", tree->data);
     PrintTree(output, tree->left);
     PrintTree(output, tree->right);
-    fprintf(output, "\n)");
+    fprintf(output, ")");
 }
 
 static struct ReadTreeResult ParseBaseBuffer(char **bufp);
