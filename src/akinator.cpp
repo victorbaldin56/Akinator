@@ -25,6 +25,8 @@ static bool IsGuessed(struct Tree *tree);
 static void AddNewObject(struct Tree *root, struct Tree *tree,
                          struct Tree *old_obj, const char *pathname);
 
+static ssize_t ReadInput(char *str, size_t size, FILE *input);
+
 static void AddToTree(struct Tree *tree, struct Tree *old_obj,
                       const char *new_obj_name, const char *obj_diff_name);
 
@@ -124,7 +126,7 @@ static int GuessObject(struct Tree *root, struct Tree *tree,
     TREE_ASSERT(root);
     assert(pathname);
     if (!tree) {
-        printf("I guessed successfully\n");
+        printf("Это было тривиально\n");
         return 0;
     }
     bool is_guessed = IsGuessed(tree);
@@ -171,13 +173,13 @@ static void AddNewObject(struct Tree *root, struct Tree *tree,
 
     printf("Что это? ");
     char new_obj_name[MAX_OBJECT_NAME_SIZE] = {};
-    fgets(new_obj_name, sizeof(new_obj_name) - 1, stdin);
-    new_obj_name[sizeof(new_obj_name) - 2] = '\0'; // FIXME
+    if (ReadInput(new_obj_name, sizeof(new_obj_name) - 1, stdin) == EOF) // FIXME
+        return;
 
     printf("Чем %s отличается от %s? ", new_obj_name, old_obj->data);
     char obj_diff_name[MAX_OBJECT_NAME_SIZE] = {};
-    fgets(obj_diff_name, sizeof(obj_diff_name) - 1, stdin);
-    obj_diff_name[sizeof(obj_diff_name) - 2] = '\0'; // FIXME
+    if (ReadInput(obj_diff_name, sizeof(obj_diff_name) - 1, stdin) == EOF) // FIXME
+        return;
 
     AddToTree(tree, old_obj, new_obj_name, obj_diff_name);
     FILE *output = fopen(pathname, "w");
@@ -188,6 +190,30 @@ static void AddNewObject(struct Tree *root, struct Tree *tree,
     DUMP_TREE(root);
     PrintTree(output, root);
 }
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wsign-conversion"
+
+static ssize_t ReadInput(char *str, size_t size, FILE *input)
+{
+    assert(str);
+    assert(input);
+    size_t i = 0;
+    for ( ; i < size; i++) {
+        int ch = fgetc(input);
+        if (ch == '\n') {
+            str[i] = '\0';
+            return i;
+        }
+        if (ch == EOF)
+            return EOF;
+        str[i] = (char)ch;
+    }
+    str[size - 1] = '\0';
+    return size;
+}
+
+#pragma GCC diagnostic pop
 
 static void AddToTree(struct Tree *tree, struct Tree *old_obj,
                       const char *new_obj_name, const char *obj_diff_name)
