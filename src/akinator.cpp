@@ -11,6 +11,7 @@
 static LoadFileErrors LoadFile(const char *pathname, char **bufptr);
 
 static void PrintLoadFileError(LoadFileErrors lf_error);
+
 static void PrintReadTreeError(ReadTreeErrors rt_error);
 
 const size_t MAX_NAME_SIZE = 1024;
@@ -39,10 +40,14 @@ static void AskObjectName(char *obj_name);
 const int DO_OBJ_NOT_FOUND = -1;
 
 static int DefineObject(struct Tree *tree, const char *obj_name);
-static bool IsFound(struct Tree *tree, const char *obj_name, Stack *stk);
-static void PrintObjectDefinition(const char *obj_name, const Stack *stk);
 
-// TODO defintion
+static bool IsFound(struct Tree *tree, const char *obj_name, Stack *stk);
+
+static void PrintObjectDefinition(struct Tree *tree, const char *obj_name,
+                                  const Stack *stk);
+
+static void PrintObjectStack(struct Tree *tree, const Stack *stk, ssize_t count);
+
 // TODO comparison
 int ExecProcess(const char *pathname)
 {
@@ -302,7 +307,7 @@ static int DefineObject(struct Tree *tree, const char *obj_name)
         StackDtor(&stk);
         return DO_OBJ_NOT_FOUND;
     }
-    PrintObjectDefinition(obj_name, &stk);
+    PrintObjectDefinition(tree, obj_name, &stk);
     StackDtor(&stk);
     return 0;
 }
@@ -319,26 +324,44 @@ static bool IsFound(struct Tree *tree, const char *obj_name, Stack *stk)
         return true;
 
     if (IsFound(tree->left, obj_name, stk)) {
-        if (Push(stk, tree->data) == REALLOC_FAILED)
+        if (Push(stk, tree) == REALLOC_FAILED)
             return false;
         return true;
     }
     if (IsFound(tree->right, obj_name, stk)) {
-        if (Push(stk, tree->data) == REALLOC_FAILED)
+        if (Push(stk, NULL) == REALLOC_FAILED)
             return false;
         return true;
     }
     return false;
 }
 
-static void PrintObjectDefinition(const char *obj_name, const Stack *stk)
+static void PrintObjectDefinition(struct Tree *tree, const char *obj_name,
+                                  const Stack *stk)
 {
     STACK_ASS(stk);
+    TREE_ASSERT(tree);
     assert(obj_name);
     printf("%s -- это: ", obj_name);
-    for (ssize_t i = stk->size - 1; i >= 0; i--) {
-        assert(stk->data[i]);
-        printf("%s, ", (const char *)stk->data[i]);
+    PrintObjectStack(tree, stk, stk->size - 1);
+}
+
+static void PrintObjectStack(struct Tree *tree, const Stack *stk, ssize_t count)
+{
+    assert(count >= 0);
+    assert(tree);
+    if (count == 0) {
+        if (stk->data[count])
+            printf("%s\n", tree->data);
+        else
+            printf("не %s\n", tree->data);
+        return;
     }
-    putchar('\n');
+    if (stk->data[count]) {
+        printf("%s, ", tree->data);
+        PrintObjectStack(tree->left, stk, count - 1);
+    } else {
+        printf("не %s, ", tree->data);
+        PrintObjectStack(tree->right, stk, count - 1);
+    }
 }
