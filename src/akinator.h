@@ -11,6 +11,7 @@ enum LoadFileErrors {
 enum AkinatorModes {
     AK_GUESS,
     AK_DEFINE,
+    AK_COMPARE,
     AK_ABORT,
 };
 

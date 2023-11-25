@@ -18,6 +18,8 @@ const size_t MAX_NAME_SIZE = 1024;
 
 static AkinatorModes AskMode();
 
+static void RunMode(struct Tree *tree, const char *pathname);
+
 const int GO_DIDNT_GUESS = -1;
 
 static int GuessObject(struct Tree *root, struct Tree *tree,
@@ -33,7 +35,7 @@ static ssize_t ReadInput(char *str, size_t size, FILE *input);
 static void AddToTree(struct Tree *tree, struct Tree *old_obj,
                       const char *new_obj_name, const char *obj_diff_name);
 
-static void EnterDefinitionMode(struct Tree *tree);
+static void RunDefinition(struct Tree *tree);
 
 static void AskObjectName(char *obj_name);
 
@@ -46,7 +48,20 @@ static bool IsFound(struct Tree *tree, const char *obj_name, Stack *stk);
 static void PrintObjectDefinition(struct Tree *tree, const char *obj_name,
                                   const Stack *stk);
 
-static void PrintObjectStack(struct Tree *tree, const Stack *stk, ssize_t count);
+static void PrintObjectStack(struct Tree *tree, const Stack *stk,
+                             ssize_t count);
+
+static void RunComparison(struct Tree *tree);
+
+static void PrintComparison(struct Tree *tree, const Stack *stk1,
+                            const Stack *stk2, const char *obj1,
+                            const char *obj2);
+
+static void PrintSimilarities(struct Tree *tree, const Stack *stk1,
+                              const Stack *stk2, ssize_t *count);
+
+static void PrintDiff(struct Tree *tree, const Stack *stk1, const Stack *stk2,
+                      ssize_t *count);
 
 // TODO comparison
 int ExecProcess(const char *pathname)
@@ -64,22 +79,7 @@ int ExecProcess(const char *pathname)
         goto ret;
     }
     DUMP_TREE(rtres.tree);
-    switch (AskMode()) {
-        case AK_GUESS: {
-            GuessObject(rtres.tree, rtres.tree, pathname);
-            break;
-        }
-        case AK_DEFINE: {
-            EnterDefinitionMode(rtres.tree);
-            break;
-        }
-        case AK_ABORT: {
-            break;
-        }
-        default: {
-            assert(0 && "Unhandled enum value");
-        }
-    }
+    RunMode(rtres.tree, pathname);
     TreeDtor(rtres.tree);
 ret:
     free(buf);
@@ -151,9 +151,37 @@ static void PrintReadTreeError(ReadTreeErrors rt_error)
     }
 }
 
+static void RunMode(struct Tree *tree, const char *pathname)
+{
+    assert(pathname);
+    TREE_ASSERT(tree);
+    switch (AskMode()) {
+        case AK_GUESS: {
+            GuessObject(tree, tree, pathname);
+            return;
+        }
+        case AK_DEFINE: {
+            RunDefinition(tree);
+            return;
+        }
+        case AK_ABORT: {
+            return;
+        }
+        case AK_COMPARE: {
+            RunComparison(tree);
+            return;
+        }
+        default: {
+            assert(0 && "Unhandled enum value");
+        }
+    }
+
+}
+
 static AkinatorModes AskMode()
 {
-    printf("Выберите режим работы: определить [d], угадать [g]: ");
+    printf("Выберите режим работы: определить [d], сравнить [c], "
+           "угадать [g]: ");
     int ch = getchar();
     getchar();
     switch(ch) {
@@ -162,6 +190,9 @@ static AkinatorModes AskMode()
         }
         case 'g': {
             return AK_GUESS;
+        }
+        case 'c': {
+            return AK_COMPARE;
         }
         default: {
             printf("Неизвестная команда.\n");
@@ -236,7 +267,7 @@ static void AddNewObject(struct Tree *root, struct Tree *tree,
     AddToTree(tree, old_obj, new_obj_name, obj_diff_name);
     FILE *output = fopen(pathname, "w");
     if (!output) {
-        perror(""); // FIXME error code
+        perror("Не получилось перезаписать базу"); // FIXME error code
         return;
     }
     printf("База пополнена, спасибо за предоставленные сведения!\n");
@@ -288,7 +319,7 @@ static void AskObjectName(char *obj_name)
         return;
 }
 
-static void EnterDefinitionMode(struct Tree *tree)
+static void RunDefinition(struct Tree *tree)
 {
     TREE_ASSERT(tree);
     char obj[MAX_NAME_SIZE] = {};
@@ -363,5 +394,77 @@ static void PrintObjectStack(struct Tree *tree, const Stack *stk, ssize_t count)
     } else {
         printf("не %s, ", tree->data);
         PrintObjectStack(tree->right, stk, count - 1);
+    }
+}
+
+static void RunComparison(struct Tree *tree)
+{
+    TREE_ASSERT(tree);
+    char obj1[MAX_NAME_SIZE] = {};
+    AskObjectName(obj1);
+    char obj2[MAX_NAME_SIZE] = {};
+    AskObjectName(obj2);
+
+    Stack stk1 = {}, stk2 = {};
+    StackCtor(&stk1);
+    StackCtor(&stk2);
+    if (IsFound(tree, obj1, &stk1) && IsFound(tree, obj2, &stk2))
+        PrintComparison(tree, &stk1, &stk2, obj1, obj2);
+
+    StackDtor(&stk1);
+    StackDtor(&stk2);
+}
+
+static void PrintComparison(struct Tree *tree, const Stack *stk1,
+                            const Stack *stk2, const char *obj1,
+                            const char *obj2)
+{
+    TREE_ASSERT(tree);
+    STACK_ASS(stk1);
+    STACK_ASS(stk2);
+    assert(obj1 && obj2);
+
+    printf("%s и %s схожи тем, что оба: ", obj1, obj2);
+    ssize_t count = stk1->size - 1;
+    PrintSimilarities(tree, stk1, stk2, &count);
+    printf("\n%s отличается от %s тем, что: ", obj1, obj2);
+    PrintDiff(tree, stk1, stk2, &count);
+    putchar('\n');
+}
+
+static void PrintSimilarities(struct Tree *tree, const Stack *stk1,
+                              const Stack *stk2, ssize_t *count)
+{
+    TREE_ASSERT(tree);
+    STACK_ASS(stk1);
+    STACK_ASS(stk2);
+    assert(count);
+    if (*count == 0 || ((stk1->data[*count] == 0) != (stk2->data[*count] == 0)))
+        return;
+
+    if (stk1->data[(*count)--]) {
+        printf("%s, ", tree->data);
+        PrintSimilarities(tree->left, stk1, stk2, count);
+    } else {
+        printf("не %s, ", tree->data);
+        PrintSimilarities(tree->right, stk1, stk2, count);
+    }
+}
+
+static void PrintDiff(struct Tree *tree, const Stack *stk1, const Stack *stk2,
+                      ssize_t *count)
+{
+    TREE_ASSERT(tree);
+    STACK_ASS(stk1);
+    STACK_ASS(stk2);
+    if (*count == 0)
+        return;
+
+    if (stk1->data[(*count)--]) {
+        printf("%s, ", tree->data);
+        PrintDiff(tree->left, stk1, stk2, count);
+    } else {
+        printf("не %s, ", tree->data);
+        PrintDiff(tree->right, stk1, stk2, count);
     }
 }
