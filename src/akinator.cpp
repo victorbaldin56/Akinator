@@ -11,10 +11,12 @@
 static LoadFileErrors LoadFile(const char *pathname, char **bufptr);
 
 static void PrintLoadFileError(LoadFileErrors lf_error);
-
 static void PrintReadTreeError(ReadTreeErrors rt_error);
 
-const size_t MAX_OBJECT_NAME_SIZE = 1024;
+const size_t MAX_NAME_SIZE = 1024;
+
+static AkinatorModes AskMode();
+
 const int GO_DIDNT_GUESS = -1;
 
 static int GuessObject(struct Tree *root, struct Tree *tree,
@@ -30,7 +32,16 @@ static ssize_t ReadInput(char *str, size_t size, FILE *input);
 static void AddToTree(struct Tree *tree, struct Tree *old_obj,
                       const char *new_obj_name, const char *obj_diff_name);
 
-// TODO guess
+static void EnterDefinitionMode(struct Tree *tree);
+
+static void AskObjectName(char *obj_name);
+
+const int DO_OBJ_NOT_FOUND = -1;
+
+static int DefineObject(struct Tree *tree, const char *obj_name);
+static bool IsFound(struct Tree *tree, const char *obj_name, Stack *stk);
+static void PrintObjectDefinition(const char *obj_name, const Stack *stk);
+
 // TODO defintion
 // TODO comparison
 int ExecProcess(const char *pathname)
@@ -48,7 +59,22 @@ int ExecProcess(const char *pathname)
         goto ret;
     }
     DUMP_TREE(rtres.tree);
-    GuessObject(rtres.tree, rtres.tree, pathname);
+    switch (AskMode()) {
+        case AK_GUESS: {
+            GuessObject(rtres.tree, rtres.tree, pathname);
+            break;
+        }
+        case AK_DEFINE: {
+            EnterDefinitionMode(rtres.tree);
+            break;
+        }
+        case AK_ABORT: {
+            break;
+        }
+        default: {
+            assert(0 && "Unhandled enum value");
+        }
+    }
     TreeDtor(rtres.tree);
 ret:
     free(buf);
@@ -120,13 +146,32 @@ static void PrintReadTreeError(ReadTreeErrors rt_error)
     }
 }
 
+static AkinatorModes AskMode()
+{
+    printf("Выберите режим работы: определить [d], угадать [g]: ");
+    int ch = getchar();
+    getchar();
+    switch(ch) {
+        case 'd': {
+            return AK_DEFINE;
+        }
+        case 'g': {
+            return AK_GUESS;
+        }
+        default: {
+            printf("Неизвестная команда.\n");
+            return AK_ABORT;
+        }
+    }
+}
+
 static int GuessObject(struct Tree *root, struct Tree *tree,
                        const char *pathname)
 {
     TREE_ASSERT(root);
     assert(pathname);
     if (!tree) {
-        printf("Это было тривиально\n");
+        printf("Легчайше\n");
         return 0;
     }
     bool is_guessed = IsGuessed(tree);
@@ -159,6 +204,8 @@ static bool IsGuessed(struct Tree *tree)
         case 'Y':
         case 'y':
             return true;
+        case EOF:
+            return false;
         default:
             return false;
     }
@@ -172,12 +219,12 @@ static void AddNewObject(struct Tree *root, struct Tree *tree,
     assert(pathname);
 
     printf("Что это? ");
-    char new_obj_name[MAX_OBJECT_NAME_SIZE] = {};
+    char new_obj_name[MAX_NAME_SIZE] = {};
     if (ReadInput(new_obj_name, sizeof(new_obj_name) - 1, stdin) == EOF) // FIXME
         return;
 
     printf("Чем %s отличается от %s? ", new_obj_name, old_obj->data);
-    char obj_diff_name[MAX_OBJECT_NAME_SIZE] = {};
+    char obj_diff_name[MAX_NAME_SIZE] = {};
     if (ReadInput(obj_diff_name, sizeof(obj_diff_name) - 1, stdin) == EOF) // FIXME
         return;
 
@@ -187,6 +234,7 @@ static void AddNewObject(struct Tree *root, struct Tree *tree,
         perror(""); // FIXME error code
         return;
     }
+    printf("База пополнена, спасибо за предоставленные сведения!\n");
     DUMP_TREE(root);
     PrintTree(output, root);
 }
@@ -225,4 +273,72 @@ static void AddToTree(struct Tree *tree, struct Tree *old_obj,
         tree->left = obj_diff;
     else
         tree->right = obj_diff;
+}
+
+static void AskObjectName(char *obj_name)
+{
+    assert(obj_name);
+    printf("Введите имя объекта: ");
+    if (ReadInput(obj_name, MAX_NAME_SIZE, stdin) == EOF)
+        return;
+}
+
+static void EnterDefinitionMode(struct Tree *tree)
+{
+    TREE_ASSERT(tree);
+    char obj[MAX_NAME_SIZE] = {};
+    AskObjectName(obj);
+    DefineObject(tree, obj);
+}
+
+static int DefineObject(struct Tree *tree, const char *obj_name)
+{
+    TREE_ASSERT(tree);
+    assert(obj_name);
+
+    Stack stk = {};
+    StackCtor(&stk);
+    if (!IsFound(tree, obj_name, &stk)) {
+        StackDtor(&stk);
+        return DO_OBJ_NOT_FOUND;
+    }
+    PrintObjectDefinition(obj_name, &stk);
+    StackDtor(&stk);
+    return 0;
+}
+
+static bool IsFound(struct Tree *tree, const char *obj_name, Stack *stk)
+{
+    TREE_ASSERT(tree);
+    STACK_ASS(stk);
+    assert(obj_name);
+    if (!tree)
+        return false;
+
+    if (strncmp(tree->data, obj_name, MAX_NAME_SIZE) == 0)
+        return true;
+
+    if (IsFound(tree->left, obj_name, stk)) {
+        if (Push(stk, tree->data) == REALLOC_FAILED)
+            return false;
+        return true;
+    }
+    if (IsFound(tree->right, obj_name, stk)) {
+        if (Push(stk, tree->data) == REALLOC_FAILED)
+            return false;
+        return true;
+    }
+    return false;
+}
+
+static void PrintObjectDefinition(const char *obj_name, const Stack *stk)
+{
+    STACK_ASS(stk);
+    assert(obj_name);
+    printf("%s -- это: ", obj_name);
+    for (ssize_t i = stk->size - 1; i >= 0; i--) {
+        assert(stk->data[i]);
+        printf("%s, ", (const char *)stk->data[i]);
+    }
+    putchar('\n');
 }

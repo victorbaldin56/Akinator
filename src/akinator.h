@@ -8,6 +8,12 @@ enum LoadFileErrors {
     LF_BAD_ALLOC        = -3,
 };
 
+enum AkinatorModes {
+    AK_GUESS,
+    AK_DEFINE,
+    AK_ABORT,
+};
+
 int ExecProcess(const char *filename);
 
 #endif
