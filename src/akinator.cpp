@@ -63,21 +63,23 @@ static void PrintSimilarities(struct Tree *tree, const Stack *stk1,
 static void PrintDiff(struct Tree *tree, const Stack *stk1, const Stack *stk2,
                       ssize_t *count);
 
-// TODO comparison
 int ExecProcess(const char *pathname)
 {
     assert(pathname);
+
     char *buf = NULL;
     LoadFileErrors lfres = LoadFile(pathname, &buf);
     if (lfres != LF_OK) {
         PrintLoadFileError(lfres);
         return lfres;
     }
+
     struct ReadTreeResult rtres = ReadTree(buf);
     if (rtres.error) {
         PrintReadTreeError(rtres.error);
         goto ret;
     }
+
     DUMP_TREE(rtres.tree);
     RunMode(rtres.tree, pathname);
     TreeDtor(rtres.tree);
@@ -155,6 +157,7 @@ static void RunMode(struct Tree *tree, const char *pathname)
 {
     assert(pathname);
     TREE_ASSERT(tree);
+
     switch (AskMode()) {
         case AK_GUESS: {
             GuessObject(tree, tree, pathname);
@@ -184,6 +187,7 @@ static AkinatorModes AskMode()
            "угадать [g]: ");
     int ch = getchar();
     getchar();
+
     switch(ch) {
         case 'd': {
             return AK_DEFINE;
@@ -206,10 +210,12 @@ static int GuessObject(struct Tree *root, struct Tree *tree,
 {
     TREE_ASSERT(root);
     assert(pathname);
+
     if (!tree) {
         printf("Легчайше\n");
         return 0;
     }
+
     bool is_guessed = IsGuessed(tree);
     struct Tree *next = NULL;
     if (is_guessed)
@@ -229,6 +235,7 @@ static int GuessObject(struct Tree *root, struct Tree *tree,
 static bool IsGuessed(struct Tree *tree)
 {
     TREE_ASSERT(tree);
+
     if (!tree)
         return false;
 
@@ -256,18 +263,18 @@ static void AddNewObject(struct Tree *root, struct Tree *tree,
 
     printf("Что это? ");
     char new_obj_name[MAX_NAME_SIZE] = {};
-    if (ReadInput(new_obj_name, sizeof(new_obj_name) - 1, stdin) == EOF) // FIXME
+    if (ReadInput(new_obj_name, sizeof(new_obj_name) - 1, stdin) == EOF)
         return;
 
     printf("Чем %s отличается от %s? ", new_obj_name, old_obj->data);
     char obj_diff_name[MAX_NAME_SIZE] = {};
-    if (ReadInput(obj_diff_name, sizeof(obj_diff_name) - 1, stdin) == EOF) // FIXME
+    if (ReadInput(obj_diff_name, sizeof(obj_diff_name) - 1, stdin) == EOF)
         return;
 
     AddToTree(tree, old_obj, new_obj_name, obj_diff_name);
     FILE *output = fopen(pathname, "w");
     if (!output) {
-        perror("Не получилось перезаписать базу"); // FIXME error code
+        perror("Не получилось перезаписать базу");
         return;
     }
     printf("База пополнена, спасибо за предоставленные сведения!\n");
@@ -282,6 +289,7 @@ static ssize_t ReadInput(char *str, size_t size, FILE *input)
 {
     assert(str);
     assert(input);
+
     size_t i = 0;
     for ( ; i < size; i++) {
         int ch = fgetc(input);
@@ -303,8 +311,16 @@ static void AddToTree(struct Tree *tree, struct Tree *old_obj,
                       const char *new_obj_name, const char *obj_diff_name)
 {
     assert(tree && old_obj && new_obj_name && obj_diff_name);
-    struct Tree *new_obj  = TreeCtor(new_obj_name, NULL, NULL); // FIXME alloc
+
+    struct Tree *new_obj  = TreeCtor(new_obj_name, NULL, NULL);
     struct Tree *obj_diff = TreeCtor(obj_diff_name, new_obj, old_obj);
+    if (!new_obj || !obj_diff) {
+        fprintf(stderr, "Couldnt allocate\n");
+        free(new_obj);
+        free(old_obj);
+        return;
+    }
+
     if (old_obj == tree->left)
         tree->left = obj_diff;
     else
@@ -314,6 +330,7 @@ static void AddToTree(struct Tree *tree, struct Tree *old_obj,
 static void AskObjectName(char *obj_name)
 {
     assert(obj_name);
+
     printf("Введите имя объекта: ");
     if (ReadInput(obj_name, MAX_NAME_SIZE, stdin) == EOF)
         return;
@@ -322,6 +339,7 @@ static void AskObjectName(char *obj_name)
 static void RunDefinition(struct Tree *tree)
 {
     TREE_ASSERT(tree);
+
     char obj[MAX_NAME_SIZE] = {};
     AskObjectName(obj);
     DefineObject(tree, obj);
@@ -338,6 +356,7 @@ static int DefineObject(struct Tree *tree, const char *obj_name)
         StackDtor(&stk);
         return DO_OBJ_NOT_FOUND;
     }
+
     PrintObjectDefinition(tree, obj_name, &stk);
     StackDtor(&stk);
     return 0;
@@ -348,6 +367,7 @@ static bool IsFound(struct Tree *tree, const char *obj_name, Stack *stk)
     TREE_ASSERT(tree);
     STACK_ASS(stk);
     assert(obj_name);
+
     if (!tree)
         return false;
 
@@ -359,11 +379,13 @@ static bool IsFound(struct Tree *tree, const char *obj_name, Stack *stk)
             return false;
         return true;
     }
+
     if (IsFound(tree->right, obj_name, stk)) {
         if (Push(stk, NULL) == REALLOC_FAILED)
             return false;
         return true;
     }
+
     return false;
 }
 
@@ -373,6 +395,7 @@ static void PrintObjectDefinition(struct Tree *tree, const char *obj_name,
     STACK_ASS(stk);
     TREE_ASSERT(tree);
     assert(obj_name);
+
     printf("%s -- это: ", obj_name);
     PrintObjectStack(tree, stk, stk->size - 1);
 }
@@ -381,6 +404,7 @@ static void PrintObjectStack(struct Tree *tree, const Stack *stk, ssize_t count)
 {
     assert(count >= 0);
     assert(tree);
+
     if (count == 0) {
         if (stk->data[count])
             printf("%s\n", tree->data);
@@ -388,6 +412,7 @@ static void PrintObjectStack(struct Tree *tree, const Stack *stk, ssize_t count)
             printf("не %s\n", tree->data);
         return;
     }
+
     if (stk->data[count]) {
         printf("%s, ", tree->data);
         PrintObjectStack(tree->left, stk, count - 1);
@@ -400,6 +425,7 @@ static void PrintObjectStack(struct Tree *tree, const Stack *stk, ssize_t count)
 static void RunComparison(struct Tree *tree)
 {
     TREE_ASSERT(tree);
+
     char obj1[MAX_NAME_SIZE] = {};
     AskObjectName(obj1);
     char obj2[MAX_NAME_SIZE] = {};
@@ -439,6 +465,7 @@ static void PrintSimilarities(struct Tree *tree, const Stack *stk1,
     STACK_ASS(stk1);
     STACK_ASS(stk2);
     assert(count);
+
     if (*count == 0 || ((stk1->data[*count] == 0) != (stk2->data[*count] == 0)))
         return;
 
@@ -457,6 +484,7 @@ static void PrintDiff(struct Tree *tree, const Stack *stk1, const Stack *stk2,
     TREE_ASSERT(tree);
     STACK_ASS(stk1);
     STACK_ASS(stk2);
+
     if (*count == 0)
         return;
 
